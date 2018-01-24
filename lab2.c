@@ -31,7 +31,7 @@ int main(int argc, char const *argv[]) {
   PORTC = 0x00;
   PORTD = 0x00;
 
-  
+
 
 }
 //########## Program Functions ##########
@@ -51,7 +51,7 @@ void knightrider() {// Creates knightrider pattern on LEDs
 	PORTC = 0xC0;
 	delayms(delayTime, dutyCycle);
 	PORTC = 0xE0;
-	delayms(delayTime, dutyCycle, dutyCycle);
+	delayms(delayTime, dutyCycle;
 	PORTC = 0xF0;
 	delayms(delayTime, dutyCycle);
 	for (size_t i = 0; i < 4; i++) { // Right shift LEDs
