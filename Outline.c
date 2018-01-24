@@ -1,4 +1,5 @@
 /* Code Outline and Inital Code for Mech 458 */
+//set CLKPR to 0x00
 /* Include Required Files */
 /* Define Required Registers */
 

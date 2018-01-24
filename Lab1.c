@@ -68,6 +68,16 @@ void back_forth() {
   }
   delaynms(delayTime);
 }
+
+void transfer() {
+  PORTC = 0x04;
+  delaynms(delayTime);
+  PORTC = 0x02;
+  delaynms(delayTime);
+  PORTC = 0x01;
+  delaynms(delayTime);
+}
+
 void knightrider() {
   delayTime = 50; //Delay time between led changes in ms
   out_in();
@@ -76,4 +86,31 @@ void knightrider() {
   back_forth();
   PORTC = 0x00;
   PORTD = 0x00;
+}
+for (size_t i = 0; i < count; i++) {
+  /* code */
+}
+void lightup() {
+  PORTD = 0x1C;
+  delaynms(1500);
+  PORTD = 0x10;
+  delaynms(1500);
+  PORTD = 0x20;
+  delaynms(1500);
+  PORTD = 0x31;
+  delaynms(1500);
+  PORTD = 0x40;
+  delaynms(1500);
+  PORTD = 0x19;
+  delaynms(1500);
+  PORTD = 0xAA;
+  delaynms(1500);
+  PORTD = 0x80;
+  delaynms(1500);
+  PORTD = 0x55;
+  delaynms(1500);
+  PORTD = 0xA0;
+  delaynms(1500);
+  PORTD = 0xC0;
+  delaynms(1500);
 }
