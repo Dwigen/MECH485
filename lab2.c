@@ -16,6 +16,7 @@ REVISED
 //####### Include Files #######
 #include <stdlib.h>
 #include <avr/io.h>
+#include <avr/interrupt.h>
 
 //########### Prototypes ############
 void knightrider();
@@ -65,3 +66,25 @@ void knightrider() {// Creates knightrider pattern on LEDs
 void delayms(int t) {
   /* code */
 }
+
+//Example code given in manual
+/*
+TCCR1B |=_BV(CS10); IN MAIN
+
+void mTimer(int count) {
+  int i;
+  i = 0;
+  TCCR1B|=_BV(WGM12);
+  OCRIA = 0x03E8;
+  TCNT1 = 0x0000;
+  TIMSK1 = TIMSK1 |0b00000010;
+  TIFR1 |=_BV(OCF1A);
+  while (i<count) {
+    if((TIFR1 & 0x02) == 0x02){
+      TIFR1 |=_BV(OCF1A);
+      i++;
+    }
+  }
+  return;
+}
+*/
