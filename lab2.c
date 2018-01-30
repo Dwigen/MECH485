@@ -19,11 +19,15 @@ REVISED
 #include <avr/interrupt.h>
 
 //########### Prototypes ############
-void knightrider();
-void delayms();
+void knightrider(int delaytime);
+void delayms(int count);
 
 //########## MAIN ROUTINE ###########
 int main(int argc, char const *argv[]) {
+
+  // Set timer one to run at CPU Clock, Use as pure timer
+  TCCR1B |=_BV(CS10);
+
   // Set Data Direction Registers
   DDRC = 0xFF;
   DDRD = 0xFF;
@@ -31,51 +35,45 @@ int main(int argc, char const *argv[]) {
   // Initalize IO registers to 0
   PORTC = 0x00;
   PORTD = 0x00;
-
-
-
+  while (1) {
+    knightrider(70);
+  }
 }
+
 //########## Program Functions ##########
-void knightrider() {// Creates knightrider pattern on LEDs
+void knightrider(int delaytime) {// Creates knightrider pattern on LEDs
 	PORTC = 0x03;
-	delayms(delayTime, dutyCycle);
+	delayms(delaytime);
 	PORTC = 0x07;
-	delayms(delayTime, dutyCycle);
+	delayms(delaytime);
 	PORTC = 0x0F;
-	delayms(delayTime, dutyCycle);
+	delayms(delaytime);
 	for (size_t i = 0; i < 3; i++) { // Left shift LEDs
 		PORTC = PORTC << 1;
-		delayms(delayTime, dutyCycle);
+		delayms(delaytime);
 	}
 	PORTC = 0xE0;
-	delayms(delayTime, dutyCycle);
+	delayms(delaytime);
 	PORTC = 0xC0;
-	delayms(delayTime, dutyCycle);
+	delayms(delaytime);
 	PORTC = 0xE0;
-	delayms(delayTime, dutyCycle;
+	delayms(delaytime);
 	PORTC = 0xF0;
-	delayms(delayTime, dutyCycle);
+	delayms(delaytime);
 	for (size_t i = 0; i < 4; i++) { // Right shift LEDs
 		PORTC = PORTC >> 1;
-		delayms(delayTime, dutyCycle);
+		delayms(delaytime);
 	}
 	PORTC = 0x07;
-	delayms(delayTime, dutyCycle);
+	delayms(delaytime);
 }
 
-void delayms(int t) {
-  /* code */
-}
-
-//Example code given in manual
-/*
-TCCR1B |=_BV(CS10); IN MAIN
-
-void mTimer(int count) {
+//Counter function counts milliseconds
+void delayms(int count){
   int i;
   i = 0;
   TCCR1B|=_BV(WGM12);
-  OCRIA = 0x03E8;
+  OCR1A = 0x03E8;
   TCNT1 = 0x0000;
   TIMSK1 = TIMSK1 |0b00000010;
   TIFR1 |=_BV(OCF1A);
@@ -87,4 +85,3 @@ void mTimer(int count) {
   }
   return;
 }
-*/
