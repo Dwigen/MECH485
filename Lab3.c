@@ -17,9 +17,11 @@ REVISED
 #include <stdlib.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include "LinkedQueue.h" //or include "LinkedQueue.c" unsure
 
 //########### Prototypes ############
-void addItem(int input);
+void readIn(/* arguments */);
+void readOut(/* arguments */);
 void delayms(int count);
 
 //########## MAIN ROUTINE ###########
@@ -30,44 +32,50 @@ int main(int argc, char const *argv[]) {
 
   // Set Data Direction Registers
   DDRA = 0x00;
-  DDRD = 0xFF;
+  DDRC = 0xFF;
 
-  // Initalize IO registers to 0
-  PORTD = 0x00;
-
-  //Create function to poll (or use interrupts) to look for PINA bit 3
-  //to be pulled low. Software debounce and count to 4,
-  for (size_t i = 0; i < 4; i++) {
-    //Take input and remove any input other than the first 2 bits
-    //send that to addItem
-    while (PINA & 0x04 == 0x04){
-      
-    }
-    char tempin = PINA;
-    char inA = tempin & 0x03;
-    addItem(inA, i);
+  while (1) {
+    PORTC = 0x00;
+    readIn();
+    readOut();
   }
 }
 
 //Add input to List
-void addItem(int input, int count) {
-  char outLights;
-  switch (input){
-    case 0x00:
-      outLights = 0x00;
-      break;
-    case 0x01:
-      outLights = 0x01;
-      break;
-    case 0x02:
-      outLights = 0x02;
-      break;
-    case 0x03:
-      outlights = 0x03;
-      break;
+void readIn() {
+  //Create function to poll (or use interrupts) to look for PINA bit 3
+  //to be pulled low. Software debounce and count to 4,
+  for (size_t i = 0; i < 4; i++) {
+
+    //Take input and remove any input other than the first 2 bits
+    //send that to addItem
+    while (PINA & 0xFB != 0x04){
+    }
+    delayms(20); // software debouncing the input switch.
+    while (PINA & 0x04 != 0x04){
+    }
+    delayms(20);
+    initLink(&newLink);
+    newLink->e.itemCode = i;
+    newLink->e.stage = (PINA & 0x03);
+    enqueue(&head, &tail, &newLink);
   }
+}
 
-
+void readOut(){
+    int *delete = 0;
+    dequeue(&head, &tail, &delete);
+    free(delete);
+    for (size_t i = 0; i < 3; i++) {
+      if (i == 0) {
+        PORTC = head->e.stage;
+      }else{
+        PORTC = PORTC | (head->e.stage << 2^i);
+      }
+      delayms(2000);
+      dequeue(&head, &tail, &delete);
+      free(delete);
+    }
 }
 
 //Counter function counts milliseconds
