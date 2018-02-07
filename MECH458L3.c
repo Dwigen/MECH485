@@ -34,7 +34,7 @@ int main(int argc, char const *argv[]) {
 	element eTest;		/* A variable to hold the aggregate data type known as element */
 
 	DDRB = 0xFF; 		/* Used for debugging purposes only */
-				
+
 
 	rtnLink = NULL;
 	newLink = NULL;
@@ -61,7 +61,7 @@ int main(int argc, char const *argv[]) {
 	element eTest;		/* A variable to hold the aggregate data type known as element */
 
 	DDRB = 0xFF; 		/* Used for debugging purposes only */
-				
+
 
 	rtnLink = NULL;
 	newLink = NULL;
@@ -86,15 +86,13 @@ int main(int argc, char const *argv[]) {
     	newLink->e.stage = (PINA & 0x03);
     	enqueue(&head, &tail, &newLink);
   	}
-
-   	int *delete = 0;
-    dequeue(&head, &delete);
-    free(delete);
+    dequeue(&head, &tail, &rtnLink);
+    free(rtnLink);
 
     for (size_t i = 0; i < 3; i++) {
      	if (i == 0) {
        		PORTC = head->e.stage;
-      	}
+      }
 
 	  	if(i == 1){
         	PORTC = PORTC | (head->e.stage << 2);
@@ -105,8 +103,8 @@ int main(int argc, char const *argv[]) {
       }
 
       delayms(2000);
-      dequeue(&head, &delete);
-      free(delete);
+      dequeue(&head, &tail, &rtnLink);
+      free(rtnLink);
     }
   }
 
@@ -149,7 +147,7 @@ void setup(link **h,link **t){
 
 
 /**************************************************************************************
-* DESC: This initializes a link and returns the pointer to the new link or NULL if error 
+* DESC: This initializes a link and returns the pointer to the new link or NULL if error
 * INPUT: the head and tail pointers by reference
 */
 void initLink(link **newLink){
@@ -163,9 +161,9 @@ void initLink(link **newLink){
 
 
 /****************************************************************************************
-*  DESC: Accepts as input a new link by reference, and assigns the head and tail		
-*  of the queue accordingly				
-*  INPUT: the head and tail pointers, and a pointer to the new link that was created 
+*  DESC: Accepts as input a new link by reference, and assigns the head and tail
+*  of the queue accordingly
+*  INPUT: the head and tail pointers, and a pointer to the new link that was created
 */
 /* will put an item at the tail of the queue */
 void enqueue(link **h, link **t, link **nL){
@@ -190,18 +188,20 @@ void enqueue(link **h, link **t, link **nL){
 
 /**************************************************************************************
 * DESC : Removes the link from the head of the list and assigns it to deQueuedLink
-* INPUT: The head and tail pointers, and a ptr 'deQueuedLink' 
+* INPUT: The head and tail pointers, and a ptr 'deQueuedLink'
 * 		 which the removed link will be assigned to
 */
 /* This will remove the link and element within the link from the head of the queue */
-void dequeue(link **h, link **deQueuedLink){
+void dequeue(link **h,link **t, link **deQueuedLink){
 	/* ENTER YOUR CODE HERE */
 	*deQueuedLink = *h;	// Will set to NULL if Head points to NULL
 	/* Ensure it is not an empty queue */
 	if (*h != NULL){
 		*h = (*h)->next;
 	}/*if*/
-	
+	else{
+		*t = NULL;
+	}
 	return;
 }/*dequeue*/
 
@@ -236,9 +236,9 @@ void clearQueue(link **h, link **t){
 		*h=(*h)->next;
 		free(temp);
 	}/*while*/
-	
+
 	/* Last but not least set the tail to NULL */
-	*t = NULL;		
+	*t = NULL;
 
 	return;
 }/*clearQueue*/
@@ -281,7 +281,6 @@ int size(link **h, link **t){
 		numElements++;
 		temp = temp->next;
 	}/*while*/
-	
+
 	return(numElements);
 }/*size*/
-

@@ -1,14 +1,14 @@
 /* Solution Set for the LinkedQueue.c */
-/* 	
+/*
 	Course		: UVic Mechatronics 458
 	Milestone	: 3
 	Title		: Data structures for MCUs and the Linked Queue Library
 
 	Name 1:					Student ID:
 	Name 2:					Student ID:
-	
+
 	Description: You can change the following after you read it.
-	
+
 	This main routine will only serve as a testing routine for now. At some point you can comment out
 	The main routine, and can use the following library of functions in your other applications
 
@@ -25,7 +25,7 @@
 /* Avoid using these */
 
 /* main routine */
-int main(){	
+int main(){
 
 	link *head;			/* The ptr to the head of the queue */
 	link *tail;			/* The ptr to the tail of the queue */
@@ -34,16 +34,16 @@ int main(){
 	element eTest;		/* A variable to hold the aggregate data type known as element */
 
 	DDRB = 0xFF; 		/* Used for debugging purposes only */
-				
+
 
 	rtnLink = NULL;
 	newLink = NULL;
 
 	setup(&head, &tail);
 
-	/* 
+	/*
 		Many of the following lines will test to see if your algorithms will work. You do not neccessarily
-		need the MCU attached to the computer to test this, and can do most of the work using the 
+		need the MCU attached to the computer to test this, and can do most of the work using the
 		debugger in the AVR studio while observing the I/O View in the top right corner. Click the tab
 		or PORTB to see how the output chages while 'stepping' through the routines.
 	*/
@@ -86,7 +86,7 @@ int main(){
 	//PORTB = rtnLink->e.itemCode;
 	//dequeue(&head, &rtnLink); /* remove the item at the head of the list */
 	//PORTB = rtnLink->e.itemCode;
-	
+
 	/* Tests is empty */
 	PORTB = isEmpty(&head);
 
@@ -126,7 +126,7 @@ void setup(link **h,link **t){
 
 
 /**************************************************************************************
-* DESC: This initializes a link and returns the pointer to the new link or NULL if error 
+* DESC: This initializes a link and returns the pointer to the new link or NULL if error
 * INPUT: the head and tail pointers by reference
 */
 void initLink(link **newLink){
@@ -140,9 +140,9 @@ void initLink(link **newLink){
 
 
 /****************************************************************************************
-*  DESC: Accepts as input a new link by reference, and assigns the head and tail		
-*  of the queue accordingly				
-*  INPUT: the head and tail pointers, and a pointer to the new link that was created 
+*  DESC: Accepts as input a new link by reference, and assigns the head and tail
+*  of the queue accordingly
+*  INPUT: the head and tail pointers, and a pointer to the new link that was created
 */
 /* will put an item at the tail of the queue */
 void enqueue(link **h, link **t, link **nL){
@@ -167,7 +167,7 @@ void enqueue(link **h, link **t, link **nL){
 
 /**************************************************************************************
 * DESC : Removes the link from the head of the list and assigns it to deQueuedLink
-* INPUT: The head and tail pointers, and a ptr 'deQueuedLink' 
+* INPUT: The head and tail pointers, and a ptr 'deQueuedLink'
 * 		 which the removed link will be assigned to
 */
 /* This will remove the link and element within the link from the head of the queue */
@@ -178,7 +178,9 @@ void dequeue(link **h, link **deQueuedLink){
 	if (*h != NULL){
 		*h = (*h)->next;
 	}/*if*/
-	
+	else{
+		*h = NULL;
+	}
 	return;
 }/*dequeue*/
 
@@ -213,9 +215,9 @@ void clearQueue(link **h, link **t){
 		*h=(*h)->next;
 		free(temp);
 	}/*while*/
-	
+
 	/* Last but not least set the tail to NULL */
-	*t = NULL;		
+	*t = NULL;
 
 	return;
 }/*clearQueue*/
@@ -258,7 +260,6 @@ int size(link **h, link **t){
 		numElements++;
 		temp = temp->next;
 	}/*while*/
-	
+
 	return(numElements);
 }/*size*/
-
