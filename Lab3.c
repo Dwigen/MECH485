@@ -39,7 +39,6 @@ int main(int argc, char const *argv[]) {
     readIn();
     readOut();
   }
-}
 
 //Add input to List
 void readIn() {

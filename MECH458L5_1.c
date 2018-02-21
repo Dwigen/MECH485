@@ -19,33 +19,34 @@ REVISED
 
 //########### Prototypes ############
 void rotatePlatform(int direction, int distance);
+void beltMotor(int dutyCycle, int beltDir);
 void PWM();
 void delayms(int count);
 
 //########## GLOBAL VARIABLES #######
 int stepdelay = 15; //10 is too low
 int stepPosition = 1;
+volatile unsigned char ADC_result;
+volatile unsigned int ADC_result_flag;
 
 //########## Variable Definitions ######
 #define stepOne 0b00110000
 #define stepTwo	0b00000110
 #define stepThree 0b00101000
 #define stepFour 0b00000101
-#define forward	0
-#define backward 1
-#define clkwise 0
-#define cclkwise 1
-#define black	0
-#define steel 50
-#define white 100
-#define aluminum 150
-
 
 //########## MAIN ROUTINE ###########
 int main(int argc, char const *argv[]) {
 
 	// Set timer one to run at CPU Clock, Use as pure timer
 	TCCR1B |=_BV(CS10);
+
+  cli(); //ensure interrupts are disabled
+
+  //ADC Config
+  ADCSRA |= _BV(ADEN);
+  ADCSRA |= _BV(ADIE);
+  ADMUX |= _BV(ADLAR) | _BV(REFS0);
 
 	sei(); //enable global interrupts
 
@@ -54,23 +55,21 @@ int main(int argc, char const *argv[]) {
 	DDRC = 0xFF;
 	PORTA = 0x00;
 	PORTC = 0x00;
-	PWM();
-	rotatePlatform(clkwise,101);
-	delayms(500);
-	rotatePlatform(clkwise,17);
-	delayms(500);
-	rotatePlatform(clkwise,33);
-	delayms(500);
-	rotatePlatform(clkwise,100);
-	delayms(500);
-	rotatePlatform(cclkwise,17);
-	delayms(500);
-	rotatePlatform(cclkwise,33);
-	delayms(500);
-	rotatePlatform(cclkwise,100);
-	delayms(500);
+
+  ADCSRA |= _BV(ADATE); //initalize ADC, Start Auto Conversion in free run mode (Default)
+
+  while (1) {
+    if (ADC_result_flag) {
+      PORTC = ADC_result;
+      ADC_result_flag = 0;
+    }
+  }
 }
 
+ISR(ADC_vect){
+  ADC_result = ADCH;
+  ADC_result_flag = 1;
+}
 
 //Counter function counts milliseconds
 void delayms(int count){
@@ -96,21 +95,21 @@ void rotatePlatform(int direction, int distance){
 			delayms(stepdelay);
 			switch (stepPosition) {
 				case 1:
-					PORTA = stepTwo;
-					stepPosition++;
-					break;
+				PORTA = stepTwo;
+				stepPosition++;
+				break;
 				case 2:
-					PORTA = stepThree;
-					stepPosition++;
-					break;
+				PORTA = stepThree;
+				stepPosition++;
+				break;
 				case 3:
-					PORTA = stepFour;
-					stepPosition++;
-					break;
+				PORTA = stepFour;
+				stepPosition++;
+				break;
 				case 4:
-					PORTA = stepOne;
-					stepPosition = 1;
-					break;
+				PORTA = stepOne;
+				stepPosition = 1;
+				break;
 			}
 		}
 	}
@@ -119,24 +118,36 @@ void rotatePlatform(int direction, int distance){
 			delayms(stepdelay);
 			switch (stepPosition) {
 				case 1:
-					PORTA = stepFour;
-					stepPosition = 4;
-					break;
+				PORTA = stepFour;
+				stepPosition = 4;
+				break;
 				case 2:
-					PORTA = stepOne;
-					stepPosition--;
-					break;
+				PORTA = stepOne;
+				stepPosition--;
+				break;
 				case 3:
-					PORTA = stepTwo;
-					stepPosition--;
-					break;
+				PORTA = stepTwo;
+				stepPosition--;
+				break;
 				case 4:
-					PORTA = stepThree;
-					stepPosition--;
-					break;
+				PORTA = stepThree;
+				stepPosition--;
+				break;
 			}
 		}
 	}
+}
+
+void beltMotor(int dutyCycle, int beltDir) {
+	PWM();
+	OCR0A = dutyCycle;
+	if (beltDir == 0) {
+		PORTB = 0b00101100;
+	}
+	else{
+		PORTB = 0b01001100;
+	}
+	return;
 }
 
 void PWM() {
@@ -147,4 +158,21 @@ void PWM() {
 	TCCR0B |= _BV(CS01);
 	OCR0A = 127;
 	DDRB |= _BV(PB7);
+}
+
+void ADC(/* arguments */) {
+    /*
+    set ADLAR bit in ADMUX for left adjusted allowing reading of ADCH for a 8
+    bit input
+    single conversion by writing logical 1 to ADSC
+    default ADC input is PF0
+    _BV(REFS0) sets reference voltage to AREF ## NEED EXTERNAL CAP ON AREF PIN ##
+    ADMUX = 0x60 or ADMUX =| _BV(ADLAR) | _BV(REFS0)
+    Last 4 bits of ADMUX choose input pin. 0000 sets ADC0 or PF0
+    ADCSRA - ADC Control and Status Register A
+    ADCSRA |= _BV(ADEN) enables the ADC
+    ADCSRA |= _BV(ADSC) Starts ADC single conversion
+    ADCSRB - ADC Control and Status Register B
+    ADCSRB last 3 bits select mode 000 sets free running mode, running indefinitely?
+    */
 }
