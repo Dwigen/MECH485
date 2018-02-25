@@ -1,12 +1,12 @@
 /*
 #################################################
-MILESTONE: 4
-PROGRAM: 1
+MILESTONE: 5
+PROGRAM: 2
 PROJECT:
 GROUP: 2
 NAME 1: Daniel, Wigen, V00797593
 NAME 2: Nicola, Watts, V00822833
-DESC: Stepper motor forward/reverse control, and PWM Signal Generation
+DESC: ADC input Controlling the pulse width of the DC motor running the belt
 DATA
 REVISED
 #################################################
@@ -18,14 +18,11 @@ REVISED
 #include <avr/interrupt.h>
 
 //########### Prototypes ############
-void rotatePlatform(int direction, int distance);
+void trayTimerInit();
+void counterTimerInit();
 void beltMotor(int dutyCycle, int beltDir);
 void PWM();
 void delayms(int count);
-
-//########## GLOBAL VARIABLES #######
-int stepdelay = 15; //10 is too low
-int stepPosition = 1;
 
 //########## Variable Definitions ######
 #define stepOne 0b00110000
@@ -37,10 +34,19 @@ int stepPosition = 1;
 #define brake 2
 #define clkwise 0
 #define cclkwise 1
+#define stop 2
 #define black	0
 #define steel 50
 #define white 100
 #define aluminum 150
+
+//########## GLOBAL VARIABLES #######
+unsigned char stepPosition = 1;
+unsigned char trayPosition = 0;
+unsigned char trayDirection = stop;//Keeps track of desired tray rotation direction
+unsigned long timeCounter = 0;//keeps track of time since start in ms
+volatile unsigned char ADC_result;
+volatile unsigned short ADC_result_flag;
 
 //########## MAIN ROUTINE ###########
 int main(int argc, char const *argv[]) {
@@ -74,81 +80,89 @@ int main(int argc, char const *argv[]) {
 		beltMotor(backward);//spin motor backward
 		delayms(10000);//backward for 10 seconds
 		beltMotor(brake);//stop belt ## Ensure braking high!!!
-		delayms(500)//delay 500ms before direction change
+		delayms(500)//delay 500ms before trayDirection change
 	}
 }
 
+//Updated the register controlling DC motor dutyCycle evey time a conversion occurs
 ISR(ADC_vect){
   OCR0A = ADCH;
+	ADC_result_flag = 1;
 }
 
-//Counter function counts milliseconds
-void delayms(int count){
-	int i;
-	i = 0;
-	TCCR1B|=_BV(WGM12);
-	OCR1A = 0x03E8;
-	TCNT1 = 0x0000;
-	TIMSK1 = TIMSK1 |0b00000010;
-	TIFR1 |=_BV(OCF1A);
-	while (i<count) {
-		if((TIFR1 & 0x02) == 0x02){
-			TIFR1 |=_BV(OCF1A);
-			i++;
+//rotates the tray 1 step every time timer 1 A interrupt is triggered
+ISR(TIMER1_COMPA_vect){
+	if (trayDirection == clkwise) {
+		switch (stepPosition) {
+			case 1:
+			PORTA = stepTwo;
+			stepPosition++;
+			break;
+			case 2:
+			PORTA = stepThree;
+			stepPosition++;
+			break;
+			case 3:
+			PORTA = stepFour;
+			stepPosition++;
+			break;
+			case 4:
+			PORTA = stepOne;
+			stepPosition = 1;
+			break;
 		}
+		if(trayPosition == 200){
+			trayPosition = 0;
+		}
+		else{
+			trayPosition++;
+		}
+	}
+	else if (trayDirection == cclkwise){
+		switch (stepPosition) {
+			case 1:
+			PORTA = stepFour;
+			stepPosition = 4;
+			break;
+			case 2:
+			PORTA = stepOne;
+			stepPosition--;
+			break;
+			case 3:
+			PORTA = stepTwo;
+			stepPosition--;
+			break;
+			case 4:
+			PORTA = stepThree;
+			stepPosition--;
+			break;
+		}
+		if(trayPosition == 0){
+			trayPosition = 200;
+		}
+		else{
+			trayPosition--;
+		}
+	}
+	else{
+		//do NOTHING
+	}
+}
+
+//Increments the time counter every millisecond
+ISR(TIMER3_COMPA_vect){
+	timeCounter++;
+}
+
+//Delays for specified number of milliseconds
+void delayms(int count){
+	int startTime = timeCounter;
+	while (timeCounter - startTime != count) {
 	}
 	return;
 }
 
-void rotatePlatform(int direction, int distance){
-	if (direction == 0) {
-		for (size_t i = 0; i < (distance); i++) {
-			delayms(stepdelay);
-			switch (stepPosition) {
-				case 1:
-				PORTA = stepTwo;
-				stepPosition++;
-				break;
-				case 2:
-				PORTA = stepThree;
-				stepPosition++;
-				break;
-				case 3:
-				PORTA = stepFour;
-				stepPosition++;
-				break;
-				case 4:
-				PORTA = stepOne;
-				stepPosition = 1;
-				break;
-			}
-		}
-	}
-	else {
-		for (size_t i = 0; i < (distance); i++) {
-			delayms(stepdelay);
-			switch (stepPosition) {
-				case 1:
-				PORTA = stepFour;
-				stepPosition = 4;
-				break;
-				case 2:
-				PORTA = stepOne;
-				stepPosition--;
-				break;
-				case 3:
-				PORTA = stepTwo;
-				stepPosition--;
-				break;
-				case 4:
-				PORTA = stepThree;
-				stepPosition--;
-				break;
-			}
-		}
-	}
-}
-
+//updates the direction of the belt motor
 void beltMotor(int beltDir) {
 	if (beltDir == forward) {
 		PORTB = 0b00101100;
@@ -172,7 +186,24 @@ void PWM() {
 	DDRB |= _BV(PB7);
 }
 
-void ADC(/* arguments */) {
+void trayTimerInit(){
+	TCCR1B|=_BV(WGM12);
+	OCR1A = 0x3A98; //Trigger Interrupt A every 15ms Max is 65ms
+	TCNT1 = 0x0000;
+	TIMSK1 = TIMSK1 |0b00000010;
+	TIFR1 |=_BV(OCF1A);
+	return;
+}
+
+void counterTimerInit(){
+	TCCR3B|=_BV(WGM12);
+	OCR3A = 0x03E8; //Trigger Interrupt Aevery 1ms
+	TCNT3 = 0x0000;
+	TIMSK3 = TIMSK3 |0b00000010;
+	TIFR3 |=_BV(OCF3A);
+	return;
+}
+//ADC Notes
     /*
     set ADLAR bit in ADMUX for left adjusted allowing reading of ADCH for a 8
     bit input
@@ -187,4 +218,3 @@ void ADC(/* arguments */) {
     ADCSRB - ADC Control and Status Register B
     ADCSRB last 3 bits select mode 000 sets free running mode, running indefinitely?
     */
-}

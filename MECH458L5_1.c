@@ -1,12 +1,12 @@
 /*
 #################################################
-MILESTONE: 4
+MILESTONE: 5
 PROGRAM: 1
 PROJECT:
 GROUP: 2
 NAME 1: Daniel, Wigen, V00797593
 NAME 2: Nicola, Watts, V00822833
-DESC: Stepper motor forward/reverse control, and PWM Signal Generation
+DESC: ADC input displayed on the 8 LEDs
 DATA
 REVISED
 #################################################
@@ -26,6 +26,8 @@ void delayms(int count);
 //########## GLOBAL VARIABLES #######
 int stepdelay = 15; //10 is too low
 int stepPosition = 1;
+int trayPosition = 0;
+int direction = 1;
 volatile unsigned char ADC_result;
 volatile unsigned int ADC_result_flag;
 
@@ -71,6 +73,7 @@ ISR(ADC_vect){
   ADC_result_flag = 1;
 }
 
+
 //Counter function counts milliseconds
 void delayms(int count){
 	int i;
@@ -78,7 +81,7 @@ void delayms(int count){
 	TCCR1B|=_BV(WGM12);
 	OCR1A = 0x03E8;
 	TCNT1 = 0x0000;
-	TIMSK1 = TIMSK1 |0b00000010;
+	TIMSK1 = TIMSK1 |0b00000110;
 	TIFR1 |=_BV(OCF1A);
 	while (i<count) {
 		if((TIFR1 & 0x02) == 0x02){
@@ -89,53 +92,13 @@ void delayms(int count){
 	return;
 }
 
-void rotatePlatform(int direction, int distance){
-	if (direction == 0) {
-		for (size_t i = 0; i < (distance); i++) {
-			delayms(stepdelay);
-			switch (stepPosition) {
-				case 1:
-				PORTA = stepTwo;
-				stepPosition++;
-				break;
-				case 2:
-				PORTA = stepThree;
-				stepPosition++;
-				break;
-				case 3:
-				PORTA = stepFour;
-				stepPosition++;
-				break;
-				case 4:
-				PORTA = stepOne;
-				stepPosition = 1;
-				break;
-			}
-		}
-	}
-	else {
-		for (size_t i = 0; i < (distance); i++) {
-			delayms(stepdelay);
-			switch (stepPosition) {
-				case 1:
-				PORTA = stepFour;
-				stepPosition = 4;
-				break;
-				case 2:
-				PORTA = stepOne;
-				stepPosition--;
-				break;
-				case 3:
-				PORTA = stepTwo;
-				stepPosition--;
-				break;
-				case 4:
-				PORTA = stepThree;
-				stepPosition--;
-				break;
-			}
-		}
-	}
+void trayTimer(){
+	TCCR3B|=_BV(WGM12);
+	OCR3A = 0x3A98; //run for 15ms Max is 65ms
+	TCNT3 = 0x0000;
+	TIMSK3 = TIMSK3 |0b00000010;
+	TIFR3 |=_BV(OCF3A);
+	return;
 }
 
 void beltMotor(int dutyCycle, int beltDir) {
