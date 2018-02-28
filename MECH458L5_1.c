@@ -43,28 +43,29 @@ int main(int argc, char const *argv[]) {
 	// Set timer one to run at CPU Clock, Use as pure timer
 	TCCR1B |=_BV(CS10);
 
-  cli(); //ensure interrupts are disabled
+	cli(); //ensure interrupts are disabled
 
-  //ADC Config
-  ADCSRA |= _BV(ADEN);
-  ADCSRA |= _BV(ADIE);
-  ADMUX |= _BV(ADLAR) | _BV(REFS0);
-
-	sei(); //enable global interrupts
-
+	//ADC Config
+	ADCSRA |= _BV(ADEN);
+	ADCSRA |= _BV(ADIE);
+	ADMUX |= _BV(ADLAR) | _BV(REFS0);
 	// Set Data Direction Registers
 	DDRA = 0xFF;
 	DDRC = 0xFF;
 	PORTA = 0x00;
 	PORTC = 0x00;
 
-  ADCSRA |= _BV(ADATE); //initalize ADC, Start Auto Conversion in free run mode (Default)
+	sei(); //enable global interrupts
 
-  while (1) {
-    if (ADC_result_flag) {
-      PORTC = ADC_result;
-      ADC_result_flag = 0;
-    }
+	ADCSRA |= _BV(ADSC); //initalize ADC, Start Auto Conversion in free run mode (Default)
+
+	while (1) {
+		if(ADC_result_flag){
+			PORTC = ADC_result;
+			ADC_result_flag = 0;
+			delayms(50);
+			ADCSRA |= _BV(ADSC);
+		}
   }
 }
 
@@ -81,7 +82,7 @@ void delayms(int count){
 	TCCR1B|=_BV(WGM12);
 	OCR1A = 0x03E8;
 	TCNT1 = 0x0000;
-	TIMSK1 = TIMSK1 |0b00000110;
+	TIMSK1 = TIMSK1 |0b00000010;
 	TIFR1 |=_BV(OCF1A);
 	while (i<count) {
 		if((TIFR1 & 0x02) == 0x02){
@@ -123,7 +124,6 @@ void PWM() {
 	DDRB |= _BV(PB7);
 }
 
-void ADC(/* arguments */) {
     /*
     set ADLAR bit in ADMUX for left adjusted allowing reading of ADCH for a 8
     bit input
@@ -138,4 +138,3 @@ void ADC(/* arguments */) {
     ADCSRB - ADC Control and Status Register B
     ADCSRB last 3 bits select mode 000 sets free running mode, running indefinitely?
     */
-}
