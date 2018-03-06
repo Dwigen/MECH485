@@ -6,7 +6,7 @@ PROJECT:
 GROUP: 2
 NAME 1: Daniel, Wigen, V00797593
 NAME 2: Nicola, Watts, V00822833
-DESC: ADC input displayed on the 8 LEDs
+DESC: Controls motor speed and button interrupt changes direction
 DATA
 REVISED
 #################################################
@@ -87,16 +87,6 @@ int main(int argc, char const *argv[]) {
 				direction_flag = 1;
 			}
 		}
-
-		/*
-		beltMotor(forward); //spin motor forward # note forward and reverse may need to be switched
-		PORTD = 0x10;
-
-		delayms(10000); //forward for 10 seconds
-		beltMotor(brake);//brake before changing directions
-		PORTD = 0x20;
-		delayms(500);//allow 500ms for braking
-		*/
   }
 }//end main
 
@@ -108,16 +98,6 @@ ISR(ADC_vect){
 }
 
 ISR(INT5_vect){
-	/*beltMotor(2);
-	delayms(500);
-	if (direction == 0){
-		beltMotor(1);
-		direction = 1;
-	}
-	else{
-		beltMotor(0);
-		direction = 0;
-	}*/
 	direction_change_flag = 1;
 }
 
@@ -128,7 +108,6 @@ void delayms(int count){
 	TCCR1B|=_BV(WGM12);
 	OCR1A = 0x03E8;
 	TCNT1 = 0x0000;
-	//TIMSK1 = TIMSK1 |0b00000010;
 	TIFR1 |=_BV(OCF1A);
 	while (i<count) {
 		if((TIFR1 & 0x02) == 0x02){
@@ -143,7 +122,6 @@ void trayTimer(){
 	TCCR3B|=_BV(WGM12);
 	OCR3A = 0x3A98; //run for 15ms Max is 65ms
 	TCNT3 = 0x0000;
-	//TIMSK3 = TIMSK3 |0b00000010;
 	TIFR3 |=_BV(OCF3A);
 	return;
 }
@@ -169,18 +147,3 @@ void PWM() {
 	OCR0A = 127;
 	DDRB |= _BV(PB7);
 }
-
-    /*
-    set ADLAR bit in ADMUX for left adjusted allowing reading of ADCH for a 8
-    bit input
-    single conversion by writing logical 1 to ADSC
-    default ADC input is PF0
-    _BV(REFS0) sets reference voltage to AREF ## NEED EXTERNAL CAP ON AREF PIN ##
-    ADMUX = 0x60 or ADMUX =| _BV(ADLAR) | _BV(REFS0)
-    Last 4 bits of ADMUX choose input pin. 0000 sets ADC0 or PF0
-    ADCSRA - ADC Control and Status Register A
-    ADCSRA |= _BV(ADEN) enables the ADC
-    ADCSRA |= _BV(ADSC) Starts ADC single conversion
-    ADCSRB - ADC Control and Status Register B
-    ADCSRB last 3 bits select mode 000 sets free running mode, running indefinitely?
-    */
