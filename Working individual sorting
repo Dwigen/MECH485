@@ -1,0 +1,287 @@
+/*
+#################################################
+MILESTONE: 5
+PROGRAM: 1
+PROJECT:
+GROUP: 2
+NAME 1: Daniel, Wigen, V00797593
+NAME 2: Nicola, Watts, V00822833
+DESC: ADC input displayed on the 8 LEDs
+DATA
+REVISED
+#################################################
+*/
+
+//####### Include Files #######
+#include <stdlib.h>
+#include <avr/io.h>
+#include <avr/interrupt.h>
+
+//########### Prototypes ############
+void rotatePlatform(int direction, int distance);
+void beltMotor(int beltDir);
+void PWM();
+void delayms(int count);
+void trayTimerInit();
+void home();
+
+//########## Variable Definitions ######
+#define stepOne 0b00110000
+#define stepTwo	0b00000110
+#define stepThree 0b00101000
+#define stepFour 0b00000101
+#define fullstepOne 0b00110110
+#define fullstepTwo	0b00101110
+#define fullstepThree 0b00101101
+#define fullstepFour 0b00110101
+#define forward	1
+#define backward 0
+#define brake 2
+#define clkwise 0
+#define cclkwise 1
+#define stop 2
+#define black	0
+#define steel 150
+#define white 100
+#define aluminum 50
+
+//########## GLOBAL VARIABLES #######
+int stepdelay = 15; //10 is too low
+int direction;
+int directionChange = 0;
+int display = 0;
+volatile unsigned int Display_Update;
+volatile unsigned int home_flag;
+volatile unsigned int ADC_result;
+volatile unsigned int ADC_lowest;
+volatile unsigned int ADC_readcount;
+volatile unsigned int exit_flag;
+volatile unsigned int ADC_result_flag;
+volatile unsigned int ADC_object_flag = 0;
+volatile unsigned int direction_flag;
+volatile unsigned int direction_change_flag;
+volatile unsigned char stepPosition = 1;
+volatile unsigned char trayPosition = 0;
+volatile unsigned char trayDirection = stop;//Keeps track of desired tray rotation direction
+
+//########## MAIN ROUTINE ###########
+int main(int argc, char const *argv[]) {
+
+	// Set timer one to run at CPU Clock, Use as pure timer
+	TCCR1B |=_BV(CS10);
+
+	trayTimerInit();
+	PWM();
+
+	cli(); //ensure interrupts are disabled
+	//_BV(ISC61) | _BV(ISC60)
+	EIMSK |= (_BV(INT6)|_BV(INT5)|_BV(INT4));
+	EICRB |= (_BV(ISC51) | _BV(ISC41)| _BV(ISC61) | _BV(ISC60));
+	//ADC Config
+	ADCSRA |= _BV(ADEN);
+	ADCSRA |= _BV(ADIE);
+	ADMUX |=  _BV(REFS0) | _BV(MUX0);
+	// Set Data Direction Registers
+	DDRA = 0xFF;
+	DDRC = 0xFF;
+	DDRB = 0xFF;
+	DDRD = 0xFF;
+	DDRE = 0x00;
+	PORTA = 0x00;
+	PORTB = 0x00;
+	PORTC = 0x00;
+	PORTD = 0x00;
+
+	sei(); //enable global interrupts
+	home();
+	beltMotor(forward);
+	ADC_lowest = 0xFFFF;
+	while (1) {
+		//PORTC = 0xff;
+		char sorted_flag = 0;
+		while((PINE & 0x40) == 0x40){
+			if(ADC_result_flag == 1){
+				if(ADC_lowest > ADC_result){
+					ADC_lowest = ADC_result;
+				}
+				unsigned char a = (0xFF & ADC_lowest);
+				unsigned char b = (ADC_lowest>>8);
+				b = (b<<5);
+				PORTC = a;
+				PORTD = b;
+				ADC_result_flag = 0;
+				ADCSRA |= _BV(ADSC);
+			}
+		}
+		ADC_result_flag = 0;
+		int material_type = 0;
+		material_type = ADC_lowest;
+		//PORTC = material_type;
+		ADC_object_flag = 0;
+		//ADC_readcount = 0;
+		int material = 0;
+		if(material_type > 940){
+			material = black;
+			sorted_flag = 1;
+		}
+		else if(material_type > 880){
+			material = white;
+			sorted_flag = 1;
+		}
+		else if(material_type > 400){
+			material = steel;
+			sorted_flag = 1;
+		}
+		else if(material_type > 20){
+			material = aluminum;
+			sorted_flag = 1;
+		}
+		if(sorted_flag == 1){
+			while(trayPosition != material){
+				trayDirection=clkwise;
+			}
+			trayDirection = stop;
+			while(exit_flag != 1){
+			}
+		}
+		exit_flag = 0;
+		ADC_lowest = 0xffff;
+		beltMotor(forward);
+	}//end while
+}//end main
+
+ISR(ADC_vect){
+  ADC_result = ADC;
+  ADC_result_flag = 1;
+  //ADC_readcount++;
+}
+
+ISR(INT5_vect){
+	PORTB = 0b00000000;
+	exit_flag = 1;
+	//Display_Update++;
+	//while ((PINE & 0x20) == 0x20){
+	//	}
+}
+
+ISR(INT4_vect){
+	home_flag = 1;
+}
+
+ISR(INT6_vect){
+	ADC_object_flag = 1;
+	ADCSRA |= _BV(ADSC);
+}
+
+//rotates the tray 1 step every time timer 1 A interrupt is triggered
+ISR(TIMER1_COMPA_vect){
+	if (trayDirection == clkwise) {
+		switch (stepPosition) {
+			case 1:
+			PORTA = fullstepTwo;
+			stepPosition++;
+			break;
+			case 2:
+			PORTA = fullstepThree;
+			stepPosition++;
+			break;
+			case 3:
+			PORTA = fullstepFour;
+			stepPosition++;
+			break;
+			case 4:
+			PORTA = fullstepOne;
+			stepPosition = 1;
+			break;
+		}
+		if(trayPosition == 199){
+			trayPosition = 0;
+		}
+		else{
+			trayPosition++;
+		}
+	}
+	else if (trayDirection == cclkwise){
+		switch (stepPosition) {
+			case 1:
+			PORTA = fullstepFour;
+			stepPosition = 4;
+			break;
+			case 2:
+			PORTA = fullstepOne;
+			stepPosition--;
+			break;
+			case 3:
+			PORTA = fullstepTwo;
+			stepPosition--;
+			break;
+			case 4:
+			PORTA = fullstepThree;
+			stepPosition--;
+			break;
+		}
+		if(trayPosition == 0){
+			trayPosition = 199;
+		}
+		else{
+			trayPosition--;
+		}
+	}
+	else{
+		//do NOTHING
+	}
+}//Timer 1 (rotate tray) ISR
+void home(){
+	trayDirection = clkwise;
+	while(home_flag != 1){
+	}
+	trayDirection = stop;
+	trayPosition = 0;
+}
+//Counter function counts milliseconds
+/*void delayms(int count){
+	int i;
+	i = 0;
+	TCCR1B|=_BV(WGM12);
+	OCR1A = 0x03E8;
+	TCNT1 = 0x0000;
+	TIFR1 |=_BV(OCF1A);
+	while (i<count) {
+		if((TIFR1 & 0x02) == 0x02){
+			TIFR1 |=_BV(OCF1A);
+			i++;
+		}
+	}
+	return;
+}*/
+
+void trayTimerInit(){
+	TCCR1B|=_BV(WGM12);
+	OCR1A = 0x2AF8; //Trigger Interrupt A start at 20 and move lower. maybe 5?
+	TCNT1 = 0x0000;
+	TIMSK1 = TIMSK1 |0b00000010;
+	TIFR1 |=_BV(OCF1A);
+	return;
+}
+
+void beltMotor(int beltDir) {
+	if (beltDir == 0) {
+		PORTB = 0b00001000;
+	}
+	else if (beltDir == 1){
+		PORTB = 0b00000100;
+	}
+	else if (beltDir == 2){
+		PORTB = 0b00000000;
+	}
+	return;
+}
+
+void PWM() {
+	TCCR0B |= _BV(CS01);
+	TCCR0A |= _BV(WGM01);
+	TCCR0A |= _BV(WGM00);
+	TCCR0A |= _BV(COM0A1);
+	OCR0A = 50;
+	DDRB |= _BV(PB7);
+}
