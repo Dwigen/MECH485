@@ -6,7 +6,7 @@ PROJECT:
 GROUP: 2
 NAME 1: Daniel, Wigen, V00797593
 NAME 2: Nicola, Watts, V00822833
-DESC: ADC input displayed on the 8 LEDs
+DESC: Individual sorting Station 9
 DATA
 REVISED
 #################################################
@@ -120,11 +120,11 @@ int main(int argc, char const *argv[]) {
 		ADC_object_flag = 0;
 		//ADC_readcount = 0;
 		int material = 0;
-		if(material_type > 940){
+		if(material_type > 900){
 			material = black;
 			sorted_flag = 1;
 		}
-		else if(material_type > 880){
+		else if(material_type > 850){
 			material = white;
 			sorted_flag = 1;
 		}

@@ -2,8 +2,7 @@
 
 /* Type definitions */
 typedef struct {
-	char material; 	/* stores a number describing the element */
-	unsigned long timeToDrop; 	/* time until drop to tray */
+	unsigned char material; 	/* stores a number describing the element */
 } element;
 
 typedef struct link{

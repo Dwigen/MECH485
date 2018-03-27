@@ -27,10 +27,6 @@ void trayTimerInit();
 void home();
 
 //########## Variable Definitions ######
-#define stepOne 0b00110000
-#define stepTwo	0b00000110
-#define stepThree 0b00101000
-#define stepFour 0b00000101
 #define fullstepOne 0b00110110
 #define fullstepTwo	0b00101110
 #define fullstepThree 0b00101101
@@ -99,7 +95,7 @@ int main(int argc, char const *argv[]) {
 	PORTD = 0x00;
 
 	sei(); //enable global interrupts
-	volatile link *head;			/* The ptr to the head of the queue */
+	link *head;			/* The ptr to the head of the queue */
 	link *tail;			/* The ptr to the tail of the queue */
 	link *newLink;		/* A ptr to a link aggregate data type (struct) */
 	link *rtnLink;		/* same as the above */
@@ -115,12 +111,12 @@ int main(int argc, char const *argv[]) {
 	while (1) {
 		PORTC = isEmpty(&head)<<1;
 		PORTC = isTailEmpty(&tail);
-		nextPosition = firstValue(&head).material;
-		//PORTC = 0xff;
+		//nextPosition = firstValue(&head).material;
 		sorted_flag = 0;
 		ADC_lowest = 0xFFFF;
 		while((PINE & 0x40) == 0x40){ //count number of reads and stop counting if belt is stopped
 			if(exit_flag == 1){
+				sorted_flag = 0;
 				break;
 			}
 			if(ADC_result_flag == 1){
@@ -188,6 +184,7 @@ int main(int argc, char const *argv[]) {
 			lastPosition = trayPosition;
 			beltMotor(forward);
 			exit_flag = 0;
+			ADCSRA |= _BV(ADEN);
 			thing = 0;
 		}
 	}//end while
@@ -203,6 +200,7 @@ ISR(INT5_vect){
 	PORTC = 0x3C;
 	beltMotor(brake);
 	exit_flag = 1;
+	ADCSRA ^= _BV(ADEN);
 	//Display_Update++;
 	//while ((PINE & 0x20) == 0x20){
 	//	}
@@ -219,16 +217,12 @@ ISR(INT6_vect){
 
 //rotates the tray 1 step every time timer 1 A interrupt is triggered
 ISR(TIMER1_COMPA_vect){
-	/*if (((trayPosition - lastPosition) < 10) && ((trayPosition - lastPosition) > -10)) {
-			OCR1A -= 100;
-		} else if ((trayPosition - lastPosition) > 190) {
-			OCR1A -= 100;
-		} else if (((trayPosition - nextPosition) < 10) && ((trayPosition - nextPosition) > -10)) {
-			OCR1A += 100;
-		}else if ((trayPosition - nextPosition) > 190) {
-			OCR1A += 100;
+	/*if(abs(trayPosition - lastPosition) < 10){
+		OCR1A -= 100;
+	}
+	if(abs(trayPosition - nextPosition) < 10){
+		OCR1A += 100;
 	}*/
-
 	if (trayDirection == clkwise) {
 		if (stepPosition == 1) {
 			PORTA = fullstepTwo;
@@ -301,7 +295,7 @@ void home(){
 
 void trayTimerInit(){
 	TCCR1B|=_BV(WGM12);
-	OCR1A = 0x2710; //Trigger Interrupt A start at 20 and move lower. maybe 5?
+	OCR1A = 0x2AF8; //Trigger Interrupt A start at 20 and move lower. maybe 5?
 	TCNT1 = 0x0000;
 	TIMSK1 = TIMSK1 |0b00000010;
 	TIFR1 |=_BV(OCF1A);

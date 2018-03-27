@@ -52,7 +52,8 @@ int direction;
 int directionChange = 0;
 int display = 0;
 int i = 0;
-char sorted_flag = 0;
+char sorted_items = 0;
+int item_material[4];
 unsigned char tray_ready_flag;
 volatile unsigned int Display_Update;
 volatile unsigned int home_flag;
@@ -65,8 +66,6 @@ volatile unsigned int ADC_object_flag = 0;
 volatile unsigned int direction_flag;
 volatile unsigned int direction_change_flag;
 volatile unsigned char stepPosition = 1;
-volatile unsigned char lastPosition = 0;
-volatile unsigned char nextPosition = 0;
 volatile unsigned char trayPosition = 0;
 volatile unsigned char trayDirection = stop;//Keeps track of desired tray rotation direction
 
@@ -99,7 +98,7 @@ int main(int argc, char const *argv[]) {
 	PORTD = 0x00;
 
 	sei(); //enable global interrupts
-	volatile link *head;			/* The ptr to the head of the queue */
+	link *head;			/* The ptr to the head of the queue */
 	link *tail;			/* The ptr to the tail of the queue */
 	link *newLink;		/* A ptr to a link aggregate data type (struct) */
 	link *rtnLink;		/* same as the above */
@@ -113,64 +112,70 @@ int main(int argc, char const *argv[]) {
 	home();
 	beltMotor(forward);
 	while (1) {
-		PORTC = isEmpty(&head)<<1;
-		PORTC = isTailEmpty(&tail);
-		nextPosition = firstValue(&head).material;
 		//PORTC = 0xff;
-		sorted_flag = 0;
-		ADC_lowest = 0xFFFF;
-		while((PINE & 0x40) == 0x40){ //count number of reads and stop counting if belt is stopped
-			if(exit_flag == 1){
-				break;
-			}
-			if(ADC_result_flag == 1){
-				if(ADC_lowest > ADC_result){
-					ADC_lowest = ADC_result;
+		while(i<4){
+			char sorted_flag = 0;
+			ADC_lowest = 0xFFFF;
+			while((PINE & 0x40) == 0x40){
+				if(ADC_result_flag == 1){
+					if(ADC_lowest > ADC_result){
+						ADC_lowest = ADC_result;
+					}
+					/*unsigned char a = (0xFF & ADC_lowest);
+					unsigned char b = (ADC_lowest>>8);
+					b = (b<<5);
+					PORTC = a;
+					PORTD = b;*/
+					ADC_result_flag = 0;
+					ADCSRA |= _BV(ADSC);
 				}
-				/*unsigned char a = (0xFF & ADC_lowest);
-				unsigned char b = (ADC_lowest>>8);
-				b = (b<<5);
-				PORTC = a;
-				PORTD = b;*/
+				sorted_flag = 1;
+			}
+			if(sorted_flag == 1){
 				ADC_result_flag = 0;
-				ADCSRA |= _BV(ADSC);
+				int material_type = 0;
+				material_type = ADC_lowest;
+				//PORTC = material_type;
+				ADC_object_flag = 0;
+				//ADC_readcount = 0;
+				initLink(&newLink);
+				if(material_type > 900){
+					newLink->e.material = black;
+					PORTC = newLink->e.material;
+					sorted_flag = 1;
+					i++;
+				}
+				else if(material_type > 800){
+					newLink->e.material = white;
+					PORTC = newLink->e.material;
+					sorted_flag = 1;
+					i++;
+				}
+				else if(material_type > 400){
+					newLink->e.material = steel;
+					PORTC = newLink->e.material;
+					sorted_flag = 1;
+					i++;
+				}
+				else if(material_type > 20){
+					newLink->e.material = aluminum;
+					PORTC = newLink->e.material;
+					sorted_flag = 1;
+					i++;
+				}
+				else{
+					PORTC = 0xFF;//nothing has been sensed
+				}
+				enqueue(&head, &tail, &newLink);
 			}
-			sorted_flag = 1;
 		}
-		if(sorted_flag == 1){
-			PORTC = 0x01;
-			ADC_result_flag = 0;
-			//PORTC = material_type;
-			ADC_object_flag = 0;
-			sorted_flag = 0;
-			initLink(&newLink);
-			if(ADC_lowest > 900){
-				newLink->e.material = black;
-				//PORTC = newLink->e.material;
-			}
-			else if(ADC_lowest > 800){
-				newLink->e.material = white;
-				//PORTC = newLink->e.material;
-			}
-			else if(ADC_lowest > 400){
-				newLink->e.material = steel;
-				//PORTC = newLink->e.material;
-			}
-			else if(ADC_lowest > 20){
-				newLink->e.material = aluminum;
-				//PORTC = newLink->e.material;
-			}
-			else{
-				//PORTC = 0xFF;//nothing has been sensed
-			}
-			enqueue(&head, &tail, &newLink);
-		}
-
+		PORTC = i;
+		int t;
 		int thing = 0;
-		if (isEmpty(&head) == 0 && exit_flag == 1) {
-			PORTC = 0x80;
+		for (t = 0; t < 4; t++) {
 			dequeue(&head, &tail, &rtnLink);
 			while(exit_flag == 0){
+
 			}
 			while(trayPosition != rtnLink->e.material){
 				if(thing == 0){
@@ -183,13 +188,38 @@ int main(int argc, char const *argv[]) {
 					thing = 1;
 				}
 			}
-			free(rtnLink);
+			free(&rtnLink);
 			trayDirection = stop;
-			lastPosition = trayPosition;
-			beltMotor(forward);
-			exit_flag = 0;
+			if(exit_flag == 1){
+				beltMotor(forward);
+				exit_flag = 0;
+			}
+
 			thing = 0;
 		}
+		/*
+		if(sorted_flag == 1){
+			if(tray_ready_flag == 1 && exit_flag == 1){
+				beltMotor(forward);
+				sorted_items++;
+			}
+			tray_ready_flag = 0;
+			exit_flag = 0;
+		}
+		ADC_lowest = 0xffff;
+		int a;
+		if(i == 4){
+			for (a = 0; a < 4; a++) {
+				if(exit_flag == 1){
+					while(trayPosition != item_material[a]){
+						trayDirection = clkwise;
+					}
+					trayDirection = stop;
+					beltMotor(forward);
+					exit_flag = 0;
+				}
+			}
+		}*/
 	}//end while
 }//end main
 
@@ -200,7 +230,6 @@ ISR(ADC_vect){
 }
 
 ISR(INT5_vect){
-	PORTC = 0x3C;
 	beltMotor(brake);
 	exit_flag = 1;
 	//Display_Update++;
@@ -219,29 +248,24 @@ ISR(INT6_vect){
 
 //rotates the tray 1 step every time timer 1 A interrupt is triggered
 ISR(TIMER1_COMPA_vect){
-	/*if (((trayPosition - lastPosition) < 10) && ((trayPosition - lastPosition) > -10)) {
-			OCR1A -= 100;
-		} else if ((trayPosition - lastPosition) > 190) {
-			OCR1A -= 100;
-		} else if (((trayPosition - nextPosition) < 10) && ((trayPosition - nextPosition) > -10)) {
-			OCR1A += 100;
-		}else if ((trayPosition - nextPosition) > 190) {
-			OCR1A += 100;
-	}*/
-
 	if (trayDirection == clkwise) {
-		if (stepPosition == 1) {
+		switch (stepPosition) {
+			case 1:
 			PORTA = fullstepTwo;
 			stepPosition++;
-		} else if (stepPosition == 2) {
+			break;
+			case 2:
 			PORTA = fullstepThree;
 			stepPosition++;
-		} else if (stepPosition == 3) {
+			break;
+			case 3:
 			PORTA = fullstepFour;
 			stepPosition++;
-		}else if (stepPosition == 4) {
+			break;
+			case 4:
 			PORTA = fullstepOne;
 			stepPosition = 1;
+			break;
 		}
 		if(trayPosition == 199){
 			trayPosition = 0;
@@ -251,18 +275,23 @@ ISR(TIMER1_COMPA_vect){
 		}
 	}
 	else if (trayDirection == cclkwise){
-		if (stepPosition == 1) {
+		switch (stepPosition) {
+			case 1:
 			PORTA = fullstepFour;
 			stepPosition = 4;
-		} else if (stepPosition == 2) {
+			break;
+			case 2:
 			PORTA = fullstepOne;
 			stepPosition--;
-		} else if (stepPosition == 3) {
+			break;
+			case 3:
 			PORTA = fullstepTwo;
 			stepPosition--;
-		}else if (stepPosition == 4) {
+			break;
+			case 4:
 			PORTA = fullstepThree;
 			stepPosition--;
+			break;
 		}
 		if(trayPosition == 0){
 			trayPosition = 199;
@@ -301,7 +330,7 @@ void home(){
 
 void trayTimerInit(){
 	TCCR1B|=_BV(WGM12);
-	OCR1A = 0x2710; //Trigger Interrupt A start at 20 and move lower. maybe 5?
+	OCR1A = 0x2AF8; //Trigger Interrupt A start at 20 and move lower. maybe 5?
 	TCNT1 = 0x0000;
 	TIMSK1 = TIMSK1 |0b00000010;
 	TIFR1 |=_BV(OCF1A);
@@ -326,7 +355,7 @@ void PWM() {
 	TCCR0A |= _BV(WGM01);
 	TCCR0A |= _BV(WGM00);
 	TCCR0A |= _BV(COM0A1);
-	OCR0A = 55;
+	OCR0A = 50;
 	DDRB |= _BV(PB7);
 }
 
@@ -397,7 +426,7 @@ void dequeue(link **h,link **t, link **deQueuedLink){
 	if (*h != NULL){
 		*h = (*h)->next;
 	}/*if*/
-	if(*h == NULL){
+	else{
 		*t = NULL;
 	}
 	return;
@@ -456,10 +485,7 @@ char isEmpty(link **h){
 	return(*h == NULL);
 }/*isEmpty*/
 
-char isTailEmpty(link **t){
-	/* ENTER YOUR CODE HERE */
-	return(*t == NULL);
-}/*isEmpty*
+
 
 
 

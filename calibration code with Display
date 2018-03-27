@@ -1,0 +1,136 @@
+/*
+#################################################
+MILESTONE: 5
+PROGRAM: 1
+PROJECT:
+GROUP: 2
+NAME 1: Daniel, Wigen, V00797593
+NAME 2: Nicola, Watts, V00822833
+DESC: Uses 16x2 display to show calibration results
+DATA
+REVISED
+#################################################
+*/
+
+//####### Include Files #######
+#include <stdlib.h>
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include	"mydisplay.h"
+
+//########### Prototypes ############
+void rotatePlatform(int direction, int distance);
+void beltMotor(int beltDir);
+void PWM();
+void delayms(int count);
+void trayTimerInit();
+void home();
+
+//########## Variable Definitions ######
+#define forward	(PORTB = 0b00000100);
+#define backward (PORTB = 0b00001000);
+#define brake (PORTB = 0b00000000);
+
+
+//########## GLOBAL VARIABLES #######
+int ADC_max = 0;
+int ADC_min = 0;
+int ADC_sum = 0;
+int ADC_sorted_flag = 0;
+int ADC_item_count = 0;
+volatile unsigned int ADC_result;
+volatile unsigned int ADC_readcount = 0;
+volatile unsigned int ADC_result_flag;
+
+//########## MAIN ROUTINE ###########
+int main(int argc, char const *argv[]) {
+
+	// Set timer one to run at CPU Clock, Use as pure timer
+	PWM();
+
+	cli(); //ensure interrupts are disabled
+
+	//Config External interrupts
+	EIMSK |= (_BV(INT7)|_BV(INT5));
+	EICRB |= (_BV(ISC51) |_BV(ISC71) | _BV(ISC70));
+
+	//ADC Config
+	ADCSRA |= _BV(ADEN);
+	ADCSRA |= _BV(ADIE);
+	ADMUX |= _BV(REFS0) | _BV(MUX0);
+
+	// Set Data Direction Registers
+	DDRC = 0xFF;
+	DDRB = 0xFF;
+	DDRE = 0x03;
+	PORTB = 0x00;
+	PORTC = 0x00;
+
+	sei(); //enable global interrupts
+
+	init_usCounter();
+	display_Init();
+	display_Calibration(0,0,0,0);
+
+	forward;
+	ADC_lowest = 0xFFFF;
+
+	while (1) {
+		while((PINE & 0x40) == 0x40){
+			if(ADC_result_flag == 1){
+				if(ADC_lowest > ADC_result){
+					ADC_lowest = ADC_result;
+				}
+				ADC_result_flag = 0;
+				ADCSRA |= _BV(ADSC);
+				ADC_sorted_flag = 1;
+			}
+		}
+		if(ADC_sorted_flag == 1){
+			ADC_item_count++;
+			if(ADC_item_count == 1){
+				ADC_min = ADC_lowest;
+				ADC_max = ADC_lowest;
+			}else if(ADC_lowest < ADC_min){
+				ADC_min = ADC_lowest;
+			}else if(ADC_lowest > ADC_max){
+				ADC_max = ADC_lowest;
+			}
+			ADC_sum += ADC_lowest;
+			int ADC_avg = ADC_sum/ADC_item_count;
+			update_Calibration(ADC_readcount, ADC_max, ADC_min, ADC_avg);
+			ADC_sorted_flag = 0;
+			ADC_readcount = 0;
+			ADC_lowest = 0xFFFF;
+		}
+	}//end while
+}//end main
+
+ISR(ADC_vect){
+	ADC_result = ADC;
+	ADC_readcount++;
+	ADC_result_flag = 1;
+}
+
+ISR(INT7_vect){
+	while (PINE & 0x80 == 0x80){
+	}
+	ADC_sum = 0;
+	ADC_min	= 0;
+	ADC_max = 0;
+	ADC_item_count = 0;
+	update_Calibration(ADC_readcount, ADC_max, ADC_min, 0);
+}
+
+ISR(INT5_vect){
+	ADCSRA |= _BV(ADSC);
+}
+
+void PWM() {
+	TCCR0B |= _BV(CS01);
+	TCCR0A |= _BV(WGM01);
+	TCCR0A |= _BV(WGM00);
+	TCCR0A |= _BV(COM0A1);
+	OCR0A = 70;
+	DDRB |= _BV(PB7);
+}

@@ -115,10 +115,20 @@ int main(int argc, char const *argv[]) {
 	}//End Infinite While
 }//End Main
 
+
+//ADC Values of reflectivity
+white = 0b11011100
+black = 0b11101101
+Steel = 0b10010110
+Aluminum = 0b00001111
 //Updated the register controlling DC motor dutyCycle evey time a conversion occurs
 ISR(ADC_vect){
 	OCR0A = ADCH;
 	PORTC = ADC_result;
+	//if(PORTC == 0b00001111 ) //if aluminum is sensed
+/*{
+
+}*/
 	ADCSRA |= _BV(ADSC); //initalize ADC, Start Auto Conversion in free run mode (Default)
 }//ADC ISR
 
