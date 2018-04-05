@@ -24,21 +24,21 @@ void rotatePlatform(int direction, int distance);
 void rotateTray(unsigned char dest);
 void beltMotor(int beltDir);
 void PWM();
-void delayms(unsigned long count);
+void delayms(int count);
 void trayTimerInit();
 void home();
 void homeTray();
-void ms_counter();
 void pause();
+void ramp_Down();
 
 //########## Variable Definitions ######
 #define fullstepOne 0b00110110
 #define fullstepTwo	0b00101110
 #define fullstepThree 0b00101101
 #define fullstepFour 0b00110101
-#define forward	PORTB = 0b00000100;
-#define backward PORTB = 0b00001000;
-#define brake PORTB = 0b00000000;
+#define forward	1
+#define backward 0
+#define brake 2
 #define clkwise 0
 #define cclkwise 1
 #define stop 2
@@ -48,12 +48,14 @@ void pause();
 #define aluminum 50
 
 //########## GLOBAL VARIABLES #######
-int stepdelay = 15; //10 is too low
+int stepdelay = 17; //10 is too low
 int direction;
 int directionChange = 0;
 int display = 0;
 int i = 0;
 char sorted_flag = 0;
+volatile char pause_Flag = 0;
+unsigned char tray_ready_flag;
 char sorted_black_count = 0;
 char sorted_white_count = 0;
 char sorted_steel_count = 0;
@@ -62,35 +64,37 @@ char unsorted_black_count = 0;
 char unsorted_white_count = 0;
 char unsorted_steel_count = 0;
 char unsorted_aluminum_count = 0;
-unsigned char tray_ready_flag;
-int adc_interrupt = 0;
 volatile unsigned int Display_Update;
 volatile unsigned int home_flag;
-volatile unsigned int pause_Flag;
 volatile unsigned int ADC_result;
 volatile unsigned int ADC_lowest;
 volatile unsigned int ADC_readcount;
-volatile unsigned int ramp_down_flag;
 volatile unsigned int exit_flag;
 volatile unsigned int ADC_result_flag;
 volatile unsigned int ADC_object_flag = 0;
+volatile unsigned int direction_flag;
+volatile unsigned int direction_change_flag;
 volatile unsigned char stepPosition = 1;
 volatile unsigned char lastPosition = 0;
 volatile unsigned char nextPosition = 0;
 volatile unsigned char trayPosition = 0;
 volatile unsigned char trayDirection = stop;//Keeps track of desired tray rotation direction
-volatile unsigned long millis_time =  0;
-volatile unsigned long ramp_down_time =  0;
+volatile unsigned int ramp_down_flag;
+volatile unsigned long ramp_down_counter;
 
 //########## MAIN ROUTINE ###########
 int main(int argc, char const *argv[]) {
 
+	// Set timer one to run at CPU Clock, Use as pure timer
+	TCCR1B |=_BV(CS10);
+
+	//trayTimerInit();
 	PWM();
 
 	cli(); //ensure interrupts are disabled
 	//_BV(INT7)|_BV(INT6)| _BV(ISC61)|_BV(ISC71)
-	EIMSK |= (_BV(INT5)|_BV(INT4)|_BV(INT3) | _BV(INT7)|_BV(INT6));
-	EICRB |= (_BV(ISC51) | _BV(ISC50) | _BV(ISC41)| _BV(ISC61)|_BV(ISC71));
+	EIMSK |= (_BV(INT5)|_BV(INT4)|_BV(INT3)|_BV(INT7)|_BV(INT6));
+	EICRB |= (_BV(ISC51) | _BV(ISC50) | _BV(ISC41)|_BV(ISC71) | _BV(ISC70)|_BV(ISC61) | _BV(ISC60));
 	EICRA |= (_BV(ISC31));
 	//ADC Config
 	ADCSRA |= _BV(ADEN);
@@ -101,85 +105,90 @@ int main(int argc, char const *argv[]) {
 	DDRC = 0xFF;
 	DDRB = 0xFF;
 	DDRD = 0xF0;
-	DDRE = 0x00;
+	DDRE = 0x03;
 	PORTA = 0x00;
 	PORTB = 0x00;
 	PORTC = 0x00;
 
 	sei(); //enable global interrupts
-
-	//initialize linked list
 	link *head;			/* The ptr to the head of the queue */
 	link *tail;			/* The ptr to the tail of the queue */
 	link *newLink;		/* A ptr to a link aggregate data type (struct) */
 	link *rtnLink;		/* same as the above */
+
 	rtnLink = NULL;
 	newLink = NULL;
+
 	setup(&head, &tail);
 
-	//initialize display and millisecond counter
-	ms_counter();
 	display_Init();
-
-	//Home tray and start belt
 	homeTray();
-	forward;
-
+	beltMotor(forward);
 	while (1) {
 		if(pause_Flag == 1){
 			pause();
-		}else if((millis_time - ramp_down_time) == 3000 && ramp_down_flag){
-			pause_Flag = 1;
-			pause();
 		}
-
+		else if((ramp_down_counter > 50000) && (ramp_down_flag)){
+			pause_Flag = 1;
+			ramp_down_counter = 0;
+			ramp_Down();
+		}
 		sorted_flag = 0;
 		ADC_lowest = 0xFFFF;
-		while(ADC_object_flag && ADC_readcount < 400){ //count number of reads and stop counting if belt is stopped
+		while((PINE & 0x20) == 0x20){ //count number of reads and stop counting if belt is stopped
 			/*if(exit_flag == 1){
 				sorted_flag = 0;
-				//adc_interrupt = 1;
 				break;
 			}*/
 			if(ADC_result_flag == 1){
 				if(ADC_lowest > ADC_result){
 					ADC_lowest = ADC_result;
 				}
+				/*unsigned char a = (0xFF & ADC_lowest);
+				unsigned char b = (ADC_lowest>>8);
+				b = (b<<5);
+				PORTC = a;
+				PORTD = b;*/
 				ADC_result_flag = 0;
 				ADCSRA |= _BV(ADSC);
 			}
 			sorted_flag = 1;
 		}
 		if(sorted_flag == 1){
+			PORTC = 0x01;
 			ADC_result_flag = 0;
-			//ADC_object_flag = 0;
-			ADC_readcount = 0;
+			//PORTC = material_type;
+			ADC_object_flag = 0;
 			sorted_flag = 0;
 			initLink(&newLink);
 			if(ADC_lowest > 910){
 				newLink->e.material = black;
 				unsorted_black_count++;
+				//PORTC = newLink->e.material;
 			}
-			else if(ADC_lowest > 800){
+			else if(ADC_lowest > 850){
 				newLink->e.material = white;
 				unsorted_white_count++;
+				//PORTC = newLink->e.material;
 			}
 			else if(ADC_lowest > 400){
 				newLink->e.material = steel;
 				unsorted_steel_count++;
+				//PORTC = newLink->e.material;
 			}
-			else if(ADC_lowest > 20){
+			else if(ADC_lowest >= 20){
 				newLink->e.material = aluminum;
 				unsorted_aluminum_count++;
+				//PORTC = newLink->e.material;
 			}
 			else{
+				//PORTC = 0xFF;//nothing has been sensed
 			}
-			//add detected item to linked list
 			enqueue(&head, &tail, &newLink);
 		}
 
-		//if list isn't empty and item is at exit sensor, sort item into tray
-		if(!isEmpty(&head) && exit_flag == 1) {
+		if (isEmpty(&head) == 0 && exit_flag == 1) {
+			//PORTC = 0x80;
 			dequeue(&head, &tail, &rtnLink);
 			if((trayPosition - rtnLink->e.material == 50 )||(trayPosition - rtnLink->e.material == -150 )){
 				trayDirection = cclkwise;
@@ -198,43 +207,48 @@ int main(int argc, char const *argv[]) {
 			}
 			else if(rtnLink->e.material == steel){
 				unsorted_steel_count--;
-				sorted_white_count++;
+				sorted_steel_count++;
 			}
 			else if(rtnLink->e.material == aluminum){
 				unsorted_aluminum_count--;
-				sorted_white_count++;
+				sorted_aluminum_count++;
 			}
+			//display_In_Tray(sorted_aluminum_count,sorted_steel_count,sorted_black_count,sorted_white_count);
 			free(rtnLink);
 			trayDirection = stop;
 			lastPosition = trayPosition;
-			/*ADCSRA |= _BV(ADEN);
-			if(adc_interrupt == 1){
-				ADCSRA |= _BV(ADSC);
-			}*/
-			if(ramp_down_flag){
-				ramp_down_time = millis_time;
-			}
-			forward;
+			beltMotor(forward);
+			delayms(90);
 			exit_flag = 0;
-			stepdelay = 15;
+			//ADCSRA |= _BV(ADEN);
+			PORTD = 0xF0;
+			stepdelay = 17;
+		}
+
+		if(ramp_down_flag){
+			ramp_down_counter ++;
 		}
 	}//end while
 }//end main
 
-ISR(TIMER1_COMPA_vect){
-	millis_time++;
-}
-
 ISR(ADC_vect){
   ADC_result = ADC;
   ADC_result_flag = 1;
-  ADC_readcount++;
+  //ADC_readcount++;
 }
 
 ISR(INT3_vect){
-	brake;
+	//PORTC = 0x3C;
+	PORTD = 0xC0;
+	beltMotor(brake);
 	exit_flag = 1;
+	if(ramp_down_flag){
+		ramp_down_counter = 0;
+	}
 	//ADCSRA ^= _BV(ADEN);
+	//Display_Update++;
+	//while ((PINE & 0x20) == 0x20){
+	//	}
 }
 
 ISR(INT4_vect){
@@ -246,31 +260,27 @@ ISR(INT5_vect){
 	ADCSRA |= _BV(ADSC);
 }
 
-//Pause Button ISR
-ISR(INT6_vect){
-	//while ((PINE & 0x20) == 0x20){ change to pause interrupt pin.
-	//	}
-	delayms(20);
-	pause_Flag = 1;
+ISR(INT7_vect){
+	while (PINE & 0x80 == 0x80){
+	}
 	if(pause_Flag == 0){
-		pause_Flag = 1;
+		pause_Flag =1;
 	}
 	else{
 		pause_Flag = 0;
 	}
+	delayms(100);
 }
 
-ISR(INT7_vect){
-	//while ((PINE & 0x20) == 0x20){ change to pause interrupt pin.
-	//	}
-	delayms(20);
-	ramp_down_time = millis_time;
+ISR(INT6_vect){
+	while (PINE & 0x40 == 0x40){
+	}
 	ramp_down_flag = 1;
 }
 
 void homeTray(){
 	while(!home_flag){
-		delayms(12);
+		delayms(15);
 		if (stepPosition == 1) {
 			PORTA = fullstepTwo;
 			stepPosition++;
@@ -290,10 +300,10 @@ void homeTray(){
 
 void rotateTray(unsigned char dest){
 	while(trayPosition != dest){
-		if(abs(trayPosition - lastPosition) < 10){
+		if(abs(trayPosition - lastPosition) < 10 || abs(trayPosition - lastPosition) > 190){
 			stepdelay -= 1;
 		}
-		if(abs(trayPosition - dest) < 15){
+		if(abs(trayPosition - dest) < 12){
 			stepdelay += 1;
 		}
 		if (trayDirection == clkwise) {
@@ -345,32 +355,62 @@ void rotateTray(unsigned char dest){
 	}
 }
 
-void delayms(unsigned long count){
-	unsigned long delay_time = millis_time + count;
-	while (millis_time < delay_time){
-	}
-	return;
-}
-//Counter function counts milliseconds
-void ms_counter(int count){
-	TCCR1B |=_BV(CS10);
-	TCCR1B |=_BV(WGM12);
-	OCR1A = 0x03E8;
-	TCNT1 = 0x0000;
-	TIMSK1 = TIMSK1 |0b00000010;
-	TIFR1 |=_BV(OCF1A);
-	return;
-}
-
 void pause(){
-	brake;
-	while (pause_Flag) {
+	beltMotor(brake);
+	while(pause_Flag){
 		display_In_Tray(sorted_aluminum_count,sorted_steel_count, sorted_black_count, sorted_white_count);
 		delayms(2000);
 		display_On_Belt(unsorted_aluminum_count, unsorted_steel_count, unsorted_black_count, unsorted_white_count);
 		delayms(2000);
 	}
-	forward;
+	beltMotor(forward);
+}
+
+void ramp_Down(){
+	beltMotor(brake);
+	PORTB = 0b00000011;
+	PORTA = 0x00;
+	display_In_Tray(sorted_aluminum_count,sorted_steel_count, sorted_black_count, sorted_white_count);
+	while(1){
+	}
+}
+//Counter function counts milliseconds
+void delayms(int count){
+	int i;
+	i = 0;
+	TCCR1B|=_BV(WGM12);
+	OCR1A = 0x03E8;
+	TCNT1 = 0x0000;
+	TIFR1 |=_BV(OCF1A);
+	while (i<count) {
+		if((TIFR1 & 0x02) == 0x02){
+			TIFR1 |=_BV(OCF1A);
+			i++;
+		}
+	}
+	return;
+}
+/*
+void trayTimerInit(){
+	TCCR1B|=_BV(WGM12);
+	OCR1A = 0x2AF8; //Trigger Interrupt A start at 20 and move lower. maybe 5?
+	TCNT1 = 0x0000;
+	TIMSK1 = TIMSK1 |0b00000010;
+	TIFR1 |=_BV(OCF1A);
+	return;
+}
+*/
+void beltMotor(int beltDir) {
+	if (beltDir == 0) {
+		PORTB = 0b00001000;
+	}
+	else if (beltDir == 1){
+		PORTB = 0b00000100;
+	}
+	else if (beltDir == 2){
+		PORTB = 0b00000000;
+	}
+	return;
 }
 
 void PWM() {
@@ -378,7 +418,7 @@ void PWM() {
 	TCCR0A |= _BV(WGM01);
 	TCCR0A |= _BV(WGM00);
 	TCCR0A |= _BV(COM0A1);
-	OCR0A = 60;
+	OCR0A = 80;
 	DDRB |= _BV(PB7);
 }
 
