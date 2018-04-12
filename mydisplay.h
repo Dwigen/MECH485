@@ -24,7 +24,7 @@ void display_In_Tray(char alu, char stl, char blk, char wht);
 void display_On_Belt(char alu, char stl, char blk, char wht);
 void display_Calibration(int count, int max, int min, int avg);
 void update_Calibration(int count, int max, int min, int avg);
-void integer_Convert(int in);
+void write_Number(int in);
 void write_Char(char in);
 void write_Data(char in);
 int int_count(int in);

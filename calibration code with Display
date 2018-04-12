@@ -1,8 +1,6 @@
 /*
 #################################################
-MILESTONE: 5
-PROGRAM: 1
-PROJECT:
+PROJECT: Code for Calibrating with ADC
 GROUP: 2
 NAME 1: Daniel, Wigen, V00797593
 NAME 2: Nicola, Watts, V00822833
@@ -16,7 +14,7 @@ REVISED
 #include <stdlib.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include	"mydisplay.h"
+#include "mydisplay.h"
 
 //########### Prototypes ############
 void rotatePlatform(int direction, int distance);
@@ -38,6 +36,7 @@ int ADC_min = 0;
 int ADC_sum = 0;
 int ADC_sorted_flag = 0;
 int ADC_item_count = 0;
+int ADC_lowest = 0;
 volatile unsigned int ADC_result;
 volatile unsigned int ADC_readcount = 0;
 volatile unsigned int ADC_result_flag;
@@ -62,12 +61,12 @@ int main(int argc, char const *argv[]) {
 	// Set Data Direction Registers
 	DDRC = 0xFF;
 	DDRB = 0xFF;
-	DDRE = 0x03;
+	DDRE = 0x0F;
+	DDRD = 0xFF;
 	PORTB = 0x00;
 	PORTC = 0x00;
 
 	sei(); //enable global interrupts
-
 	display_Init();
 	display_Calibration(0,0,0,0);
 
@@ -75,7 +74,7 @@ int main(int argc, char const *argv[]) {
 	ADC_lowest = 0xFFFF;
 
 	while (1) {
-		while((PINE & 0x40) == 0x40){
+		while((PINE & 0x20) == 0x20){
 			if(ADC_result_flag == 1){
 				if(ADC_lowest > ADC_result){
 					ADC_lowest = ADC_result;
@@ -90,9 +89,9 @@ int main(int argc, char const *argv[]) {
 			if(ADC_item_count == 1){
 				ADC_min = ADC_lowest;
 				ADC_max = ADC_lowest;
-			}else if(ADC_lowest < ADC_min){
+				}else if(ADC_lowest < ADC_min){
 				ADC_min = ADC_lowest;
-			}else if(ADC_lowest > ADC_max){
+				}else if(ADC_lowest > ADC_max){
 				ADC_max = ADC_lowest;
 			}
 			ADC_sum += ADC_lowest;
@@ -111,6 +110,8 @@ ISR(ADC_vect){
 	ADC_result_flag = 1;
 }
 
+// Button on interrupt used to clear current values allowing next material to
+// be calibrated
 ISR(INT7_vect){
 	while (PINE & 0x80 == 0x80){
 	}
@@ -130,6 +131,6 @@ void PWM() {
 	TCCR0A |= _BV(WGM01);
 	TCCR0A |= _BV(WGM00);
 	TCCR0A |= _BV(COM0A1);
-	OCR0A = 70;
+	OCR0A = 110;
 	DDRB |= _BV(PB7);
 }

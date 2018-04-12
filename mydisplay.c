@@ -4,7 +4,7 @@ driver, using an AT90USBKEY2 AVR micro controller.
 
 #include <mydisplay.h>
 
-//initalizes display using correct sequence from datasheet
+
 void display_Init() {
   disp_Delay(20000);
   write_Data(0x30);
@@ -22,7 +22,6 @@ void display_Init() {
   disp_Delay(2500);
 }
 
-//displays number of items sorted into tray
 void display_In_Tray(char alu, char stl, char blk, char wht) {
 	write_Data(0x02);//Set cursor to home
 	disp_Delay(2500);
@@ -37,25 +36,24 @@ void display_In_Tray(char alu, char stl, char blk, char wht) {
   write_Char(0x42);//B
   write_Char(0x4B);//K
   write_Char(0x3A);//:
-  integer_Convert(blk);
+  write_Number(blk);
   write_Data(0x8B);
   write_Char(0x57);//W
   write_Char(0x54);//T
   write_Char(0x3A);//:
-  integer_Convert(wht);
+  write_Number(wht);
   write_Data(0xC5);
   write_Char(0x41);//A
   write_Char(0x4C);//L
   write_Char(0x3A);//:
-  integer_Convert(alu);
+  write_Number(alu);
   write_Data(0xCB);
   write_Char(0x53);//S
   write_Char(0x54);//T
   write_Char(0x3A);//:
-  integer_Convert(stl);
+  write_Number(stl);
 }
 
-//displays items detected but still on the belt, run after display_In_Tray
 void display_On_Belt(char alu, char stl, char blk, char wht) {
 	write_Data(0x02);//Set cursor to home
 	disp_Delay(2500);
@@ -67,16 +65,15 @@ void display_On_Belt(char alu, char stl, char blk, char wht) {
   write_Char(0x4C);//L
   write_Char(0x54);//T
   write_Data(0x88);
-  integer_Convert(blk);
+  write_Number(blk);
   write_Data(0x8E);
-  integer_Convert(wht);
+  write_Number(wht);
   write_Data(0xC8);
-  integer_Convert(alu);
+  write_Number(alu);
   write_Data(0xCE);
-  integer_Convert(stl);
+  write_Number(stl);
 }
 
-//sets up diplay for calibration
 void display_Calibration(int count, int max, int min, int avg){
 	write_Data(0x02);//Set cursor to home
 	disp_Delay(2500);
@@ -84,41 +81,39 @@ void display_Calibration(int count, int max, int min, int avg){
   write_Char(0x4E);//N
   write_Char(0x54);//T
   write_Char(0x3A);//:
-  integer_Convert(count);
+  write_Number(count);
   write_Data(0x88);
   write_Char(0x4D);//M
   write_Char(0x41);//A
   write_Char(0x58);//X
   write_Char(0x3A);//:
-  integer_Convert(max);
+  write_Number(max);
   write_Data(0xC0);
   write_Char(0x41);//A
   write_Char(0x56);//V
   write_Char(0x47);//G
   write_Char(0x3A);//:
-  integer_Convert(avg);
+  write_Number(avg);
   write_Data(0xC8);
   write_Char(0x4D);//M
   write_Char(0x49);//I
   write_Char(0x4E);//N
   write_Char(0x3A);//:
-  integer_Convert(min);
+  write_Number(min);
 }
 
-//updates calibration values
 void update_Calibration(int count, int max, int min, int avg){
   write_Data(0x84);
-  integer_Convert(count);
+  write_Number(count);
   write_Data(0x8C);
-  integer_Convert(max);
+  write_Number(max);
   write_Data(0xC4);
-  integer_Convert(avg);
+  write_Number(avg);
   write_Data(0xCC);
-  integer_Convert(min);
+  write_Number(min);
 }
 
-//converts integers into single digits and prints them
-void integer_Convert(int in){
+void write_Number(int in){
   int cnt = int_count(in);
   int intArray[cnt];
   int othercnt = cnt;
@@ -170,7 +165,6 @@ void integer_Convert(int in){
   }
 }
 
-//writes config instruction to display driver
 void write_Data(char in) {
   controlPort &= INVRS;
   dataPort = in;
@@ -182,7 +176,6 @@ void write_Data(char in) {
   disp_Delay(100);
 }
 
-//writes character to display takes hex value of char
 void write_Char(char in) {
   controlPort |= RS;
   disp_Delay(1);
@@ -194,7 +187,6 @@ void write_Char(char in) {
   controlPort &= INVRS;
 }
 
-//count number of digits in integer
 int int_count(int in){
   int cnt = 1;
   while (in /= 10) {
@@ -203,10 +195,9 @@ int int_count(int in){
   return cnt;
 }
 
-// microsecond delay function
 void disp_Delay(int count){
 	TCCR3B|= (_BV(WGM32) | _BV(CS30));
-	OCR3A = 0x0001; //one clock cycle timer.
+	OCR3A = 0x0001; //interrupt every .1 ms @ 100MHz clk
 	TCNT3 = 0x0000;
 	TIFR1 |=_BV(OCF3A);
 	int i = 0;
