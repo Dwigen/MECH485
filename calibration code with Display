@@ -68,7 +68,6 @@ int main(int argc, char const *argv[]) {
 
 	sei(); //enable global interrupts
 
-	init_usCounter();
 	display_Init();
 	display_Calibration(0,0,0,0);
 
